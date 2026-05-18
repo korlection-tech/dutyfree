@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>免稅品價格快捷查詢系統 (圖片防錯完美版)</title>
+    <title>免稅品價格快捷查詢系統</title>
     <style>
         :root {
             --primary-color: #007aff;
@@ -41,28 +41,14 @@
             font-size: 14px;
             margin-bottom: 25px;
         }
-        .upload-box {
-            border: 2px dashed #d2d2d7;
-            padding: 25px;
-            border-radius: 10px;
+        .system-status {
             text-align: center;
-            background: #fafafa;
-            margin-bottom: 25px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .upload-box.dragover {
-            border-color: var(--primary-color);
-            background: rgba(0, 122, 255, 0.05);
-        }
-        .upload-status {
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 13px;
             color: #86868b;
-            line-height: 1.5;
-        }
-        .upload-status.loaded {
-            color: var(--success-color);
+            margin-bottom: 20px;
+            padding: 8px;
+            background: #fafafa;
+            border-radius: 6px;
         }
         .search-box {
             margin-bottom: 20px;
@@ -183,20 +169,25 @@
             font-weight: normal;
             margin-right: 2px;
         }
+        .error-msg {
+            color: #ff3b30;
+            background: #fff2f1;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>免稅品價格查詢系統</h1>
-    <div class="subtitle">每次最多可同時查詢 10 項產品 (支援圖片預覽)</div>
+    <div class="subtitle">每次最多可同時查詢 10 項產品</div>
 
+    <div class="system-status" id="systemStatus">⏳ 正在連線至雲端數據庫...</div>
     <div class="error-msg" id="errorMsg"></div>
-
-    <div class="upload-box" id="dropZone" onclick="document.getElementById('csvFile').click()">
-        <span class="upload-status" id="uploadStatus">📁 點擊或拖放最新「Duty Free Pricelist.csv」至此處載入</span>
-        <input type="file" id="csvFile" accept=".csv" style="display:none" onchange="handleFileSelect(event)">
-    </div>
 
     <div class="search-box">
         <label for="keywords">請輸入產品關鍵字 (每行一項)：</label>
@@ -204,109 +195,94 @@
         <div class="hint" id="lineCount">目前輸入：0 / 10 項</div>
     </div>
 
-    <button id="searchBtn" onclick="searchPrices()" disabled>請先載入 CSV 數據</button>
+    <button id="searchBtn" onclick="searchPrices()" disabled>請稍候...</button>
 
     <div class="results-container" id="results"></div>
 </div>
 
 <script>
     let productData = []; 
+    // 💡 系統會自動讀取同一個資料夾底下的價錢表
+    const csvFileName = 'Duty Free Pricelist.csv'; 
 
     const textarea = document.getElementById('keywords');
     const lineCountHint = document.getElementById('lineCount');
     const errorMsg = document.getElementById('errorMsg');
     const resultsContainer = document.getElementById('results');
-    const dropZone = document.getElementById('dropZone');
-    const uploadStatus = document.getElementById('uploadStatus');
+    const systemStatus = document.getElementById('systemStatus');
     const searchBtn = document.getElementById('searchBtn');
 
-    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragover'); });
-    dropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropZone.classList.remove('dragover');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) parseCSV(files[0]);
+    // 網頁開啟時，自動去後台抓取 CSV 檔案
+    window.addEventListener('DOMContentLoaded', () => {
+        fetch(csvFileName)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('找不到雲端價錢表檔案，請確保已上傳 Duty Free Pricelist.csv');
+            }
+            return response.text();
+        })
+        .then(text => {
+            parseCSV(text);
+        })
+        .catch(err => {
+            showError("⚠️ 系統錯誤: " + err.message);
+            systemStatus.innerText = "❌ 數據庫載入失敗";
+            systemStatus.style.color = "#ff3b30";
+        });
     });
 
-    function handleFileSelect(event) {
-        const file = event.target.files[0];
-        if (file) parseCSV(file);
-    }
+    function parseCSV(text) {
+        const lines = text.split(/\r\n|\n|\r/); 
+        productData = [];
 
-    function parseCSV(file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const text = e.target.result;
-            const lines = text.split(/\r\n|\n|\r/); 
-            productData = [];
+        let brandIdx = 0;
+        let nameIdx = 1;
+        let priceIdx = 2;
+        let imgIdx = 3; 
 
-            if(lines.length === 0 || lines[0].trim() === "") {
-                showError("檔案好像是空的？");
-                return;
-            }
-
-            // 完全鎖定最新上傳檔案嘅結構：A=Brand, B=Product Name, C=Price, D=Image
-            let brandIdx = 0;
-            let nameIdx = 1;
-            let priceIdx = 2;
-            let imgIdx = 3; 
-
-            for (let i = 1; i < lines.length; i++) { // 直接由第2行開始讀，繞過Header
-                if (lines[i].trim() === '') continue;
-                const row = parseCSVLine(lines[i]);
+        for (let i = 1; i < lines.length; i++) { 
+            if (lines[i].trim() === '') continue;
+            const row = parseCSVLine(lines[i]);
+            
+            if (row.length >= 2) {
+                let pBrand = row[brandIdx] ? row[brandIdx].trim().replace(/^"|"$/g, '') : '';
+                let pName = row[nameIdx] ? row[nameIdx].trim().replace(/^"|"$/g, '') : '';
+                let pPrice = row[priceIdx] ? row[priceIdx].trim().replace(/^"|"$/g, '') : '--';
+                let pImg = row[imgIdx] ? row[imgIdx].trim().replace(/^"|"$/g, '') : '';
                 
-                if (row.length >= 2) {
-                    let pBrand = row[brandIdx] ? row[brandIdx].trim().replace(/^"|"$/g, '') : '';
-                    let pName = row[nameIdx] ? row[nameIdx].trim().replace(/^"|"$/g, '') : '';
-                    let pPrice = row[priceIdx] ? row[priceIdx].trim().replace(/^"|"$/g, '') : '--';
-                    let pImg = row[imgIdx] ? row[imgIdx].trim().replace(/^"|"$/g, '') : '';
-                    
-                    // 清理有時候價錢欄位裡殘留的引號
-                    pPrice = pPrice.replace(/["']/g, '');
+                pPrice = pPrice.replace(/["']/g, '');
 
-                    if(pBrand || pName) {
-                        productData.push({ 
-                            brand: pBrand,
-                            name: pName, 
-                            price: pPrice,
-                            img: pImg,
-                            searchStr: (pBrand + " " + pName).toLowerCase() 
-                        });
-                    }
+                if(pBrand || pName) {
+                    productData.push({ 
+                        brand: pBrand,
+                        name: pName, 
+                        price: pPrice,
+                        img: pImg,
+                        searchStr: (pBrand + " " + pName).toLowerCase() 
+                    });
                 }
             }
+        }
 
-            if (productData.length > 0) {
-                uploadStatus.innerText = `✅ 成功載入最新數據：${file.name}\n(共偵測到 ${productData.length} 條連圖片產品)`;
-                uploadStatus.className = "upload-status loaded";
-                searchBtn.disabled = false;
-                searchBtn.innerText = "立即查詢";
-                errorMsg.style.display = "none";
-            } else {
-                showError("讀取不到數據，請確保 CSV 格式與上傳的檔案一致。");
-            }
-        };
-        
-        reader.readAsText(file, 'UTF-8'); 
+        if (productData.length > 0) {
+            systemStatus.innerText = `🟢 雲端數據庫連線成功 (已實時同步 ${productData.length} 條產品)`;
+            systemStatus.style.color = "#34c759";
+            searchBtn.disabled = false;
+            searchBtn.innerText = "立即查詢";
+        } else {
+            showError("價錢表內無有效數據。");
+        }
     }
 
-    // 終極升級版 CSV 解析器：完美封鎖引號、分號及網址內嘅特殊字符
     function parseCSVLine(text) {
         let cells = [];
         let currentCell = '';
         let inQuotes = false;
-
         for (let i = 0; i < text.length; i++) {
             let c = text[i];
-            if (c === '"') {
-                inQuotes = !inQuotes;
-            } else if (c === ',' && !inQuotes) {
-                cells.push(currentCell);
-                currentCell = '';
-            } else {
-                currentCell += c;
-            }
+            if (c === '"') { inQuotes = !inQuotes; }
+            else if (c === ',' && !inQuotes) { cells.push(currentCell); currentCell = ''; }
+            else { currentCell += c; }
         }
         cells.push(currentCell);
         return cells;
@@ -332,20 +308,367 @@
         lines.forEach(keyword => {
             const lowerKeyword = keyword.toLowerCase();
             const matches = productData.filter(prod => prod.searchStr.includes(lowerKeyword));
-            
             const resultItem = document.createElement('div');
             resultItem.className = 'result-item';
-            
             let contentHtml = `<div class="keyword-header"><span class="search-keyword">搜尋: "${keyword}"</span></div>`;
 
             if (matches.length > 0) {
                 matches.forEach(match => {
-                    // 如果有相片就用容器裝住，否則顯示預設佔位符，美化排版
                     let imgHtml = match.img ? 
-                        `<div class="img-wrapper"><img src="${match.img}" class="prod-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100\' height=\'100\' fill=\'%23eee\'/><text x=\'50%\' y=\'50%\' font-size=\'12\' text-anchor=\'middle\' alignment-baseline=\'middle\' fill=\'%23aaa\'>無圖片</text></svg>凸';"></div>` : 
+                        `<div class="img-wrapper"><img src="${match.img}" class="prod-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100\' height=\'100\' fill=\'%23eee\'/><text x=\'50%\' y=\'50%\' font-size=\'12\' text-anchor=\'middle\' alignment-baseline=\'middle\' fill=\'%23aaa\'>無圖片</text></svg>';"></div>` : 
                         `<div class="img-wrapper" style="background:#eee;color:#aaa;font-size:11px;display:flex;align-items:center;justify-content:center;">無圖片</div>`;
                     
-                    // 格式化價錢：如果是純數字，自動補上 HK$
+                    let displayPrice = match.price;
+                    if(!isNaN(displayPrice.trim())) {
+                        displayPrice = `<span class="price-currency">HK$</span>${displayPrice}`;
+                    }
+
+                    contentHtml += `
+                        <div class="result-row">
+                            ${imgHtml}
+                            <div class="prod-info">
+                                <div class="prod-brand">${match.brand}</div>
+                                <div class="prod-name">${match.name}</div>
+                            </div>
+                            <div class="prod-price">${displayPrice}</div>
+                        </div>`;
+                });
+            } else {
+                contentHtml += `
+                    <div class="result-row">
+                        <div class="prod-info">
+                            <div class="prod-name" style="color:#86868b; font-style:italic;">找不到相關產品</div>
+                        </div>
+                        <div class="prod-price" style="color:#86868b;">--</div>
+                    </div>`;
+            }
+            resultItem.innerHTML = contentHtml;
+            resultsContainer.appendChild(resultItem);
+        });
+    }
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>免稅品價格快捷查詢系統</title>
+    <style>
+        :root {
+            --primary-color: #007aff;
+            --success-color: #34c759;
+            --bg-color: #f5f5f7;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 650px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+        }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: #1d1d1f;
+        }
+        .subtitle {
+            text-align: center;
+            color: #86868b;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .system-status {
+            text-align: center;
+            font-size: 13px;
+            color: #86868b;
+            margin-bottom: 20px;
+            padding: 8px;
+            background: #fafafa;
+            border-radius: 6px;
+        }
+        .search-box {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        textarea {
+            width: 100%;
+            height: 120px;
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 16px;
+            resize: none;
+            box-sizing: border-box;
+            outline: none;
+        }
+        textarea:focus {
+            border-color: var(--primary-color);
+        }
+        .hint {
+            font-size: 12px;
+            color: #86868b;
+            margin-top: 5px;
+        }
+        button {
+            width: 100%;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: #d2d2d7;
+            cursor: not-allowed;
+        }
+        .results-container {
+            margin-top: 25px;
+        }
+        .result-item {
+            padding: 15px 0;
+            border-bottom: 1px solid #e5e5ea;
+        }
+        .keyword-header {
+            margin-bottom: 10px;
+        }
+        .result-row {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            padding: 12px;
+            background: #fbfbfd;
+            border-radius: 8px;
+            gap: 15px;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.02);
+        }
+        .img-wrapper {
+            width: 75px;
+            height: 75px;
+            background: #fff;
+            border: 1px solid #e5e5ea;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .prod-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .prod-info {
+            flex-grow: 1;
+        }
+        .search-keyword {
+            font-size: 12px;
+            color: #007aff;
+            background: rgba(0, 122, 255, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        .prod-brand {
+            font-size: 11px;
+            color: #007aff;
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 3px;
+            letter-spacing: 0.5px;
+        }
+        .prod-name {
+            font-weight: 500;
+            word-break: break-word;
+            padding-right: 10px;
+            font-size: 14px;
+            color: #1d1d1f;
+            line-height: 1.4;
+        }
+        .prod-price {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ff3b30;
+            white-space: nowrap;
+            text-align: right;
+        }
+        .price-currency {
+            font-size: 12px;
+            font-weight: normal;
+            margin-right: 2px;
+        }
+        .error-msg {
+            color: #ff3b30;
+            background: #fff2f1;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>免稅品價格查詢系統</h1>
+    <div class="subtitle">每次最多可同時查詢 10 項產品</div>
+
+    <div class="system-status" id="systemStatus">⏳ 正在連線至雲端數據庫...</div>
+    <div class="error-msg" id="errorMsg"></div>
+
+    <div class="search-box">
+        <label for="keywords">請輸入產品關鍵字 (每行一項)：</label>
+        <textarea id="keywords" placeholder="例如：&#10;HEART PERCENT&#10;Lip Balm&#10;EYE PALETTE"></textarea>
+        <div class="hint" id="lineCount">目前輸入：0 / 10 項</div>
+    </div>
+
+    <button id="searchBtn" onclick="searchPrices()" disabled>請稍候...</button>
+
+    <div class="results-container" id="results"></div>
+</div>
+
+<script>
+    let productData = []; 
+    // 💡 系統會自動讀取同一個資料夾底下的價錢表
+    const csvFileName = 'Duty Free Pricelist.csv'; 
+
+    const textarea = document.getElementById('keywords');
+    const lineCountHint = document.getElementById('lineCount');
+    const errorMsg = document.getElementById('errorMsg');
+    const resultsContainer = document.getElementById('results');
+    const systemStatus = document.getElementById('systemStatus');
+    const searchBtn = document.getElementById('searchBtn');
+
+    // 網頁開啟時，自動去後台抓取 CSV 檔案
+    window.addEventListener('DOMContentLoaded', () => {
+        fetch(csvFileName)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('找不到雲端價錢表檔案，請確保已上傳 Duty Free Pricelist.csv');
+            }
+            return response.text();
+        })
+        .then(text => {
+            parseCSV(text);
+        })
+        .catch(err => {
+            showError("⚠️ 系統錯誤: " + err.message);
+            systemStatus.innerText = "❌ 數據庫載入失敗";
+            systemStatus.style.color = "#ff3b30";
+        });
+    });
+
+    function parseCSV(text) {
+        const lines = text.split(/\r\n|\n|\r/); 
+        productData = [];
+
+        let brandIdx = 0;
+        let nameIdx = 1;
+        let priceIdx = 2;
+        let imgIdx = 3; 
+
+        for (let i = 1; i < lines.length; i++) { 
+            if (lines[i].trim() === '') continue;
+            const row = parseCSVLine(lines[i]);
+            
+            if (row.length >= 2) {
+                let pBrand = row[brandIdx] ? row[brandIdx].trim().replace(/^"|"$/g, '') : '';
+                let pName = row[nameIdx] ? row[nameIdx].trim().replace(/^"|"$/g, '') : '';
+                let pPrice = row[priceIdx] ? row[priceIdx].trim().replace(/^"|"$/g, '') : '--';
+                let pImg = row[imgIdx] ? row[imgIdx].trim().replace(/^"|"$/g, '') : '';
+                
+                pPrice = pPrice.replace(/["']/g, '');
+
+                if(pBrand || pName) {
+                    productData.push({ 
+                        brand: pBrand,
+                        name: pName, 
+                        price: pPrice,
+                        img: pImg,
+                        searchStr: (pBrand + " " + pName).toLowerCase() 
+                    });
+                }
+            }
+        }
+
+        if (productData.length > 0) {
+            systemStatus.innerText = `🟢 雲端數據庫連線成功 (已實時同步 ${productData.length} 條產品)`;
+            systemStatus.style.color = "#34c759";
+            searchBtn.disabled = false;
+            searchBtn.innerText = "立即查詢";
+        } else {
+            showError("價錢表內無有效數據。");
+        }
+    }
+
+    function parseCSVLine(text) {
+        let cells = [];
+        let currentCell = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            let c = text[i];
+            if (c === '"') { inQuotes = !inQuotes; }
+            else if (c === ',' && !inQuotes) { cells.push(currentCell); currentCell = ''; }
+            else { currentCell += c; }
+        }
+        cells.push(currentCell);
+        return cells;
+    }
+
+    textarea.addEventListener('input', () => {
+        const lines = textarea.value.split('\n').filter(line => line.trim() !== '');
+        lineCountHint.innerText = `目前輸入：${lines.length} / 10 項`;
+        if (lines.length > 10) showError("⚠️ 系統只會查詢前 10 項。");
+        else errorMsg.style.display = "none";
+    });
+
+    function showError(msg) {
+        errorMsg.innerText = msg;
+        errorMsg.style.display = "block";
+    }
+
+    function searchPrices() {
+        const lines = textarea.value.split('\n').map(line => line.trim()).filter(line => line !== '').slice(0, 10);
+        if (lines.length === 0) { alert("請先輸入關鍵字！"); return; }
+        resultsContainer.innerHTML = ""; 
+
+        lines.forEach(keyword => {
+            const lowerKeyword = keyword.toLowerCase();
+            const matches = productData.filter(prod => prod.searchStr.includes(lowerKeyword));
+            const resultItem = document.createElement('div');
+            resultItem.className = 'result-item';
+            let contentHtml = `<div class="keyword-header"><span class="search-keyword">搜尋: "${keyword}"</span></div>`;
+
+            if (matches.length > 0) {
+                matches.forEach(match => {
+                    let imgHtml = match.img ? 
+                        `<div class="img-wrapper"><img src="${match.img}" class="prod-img" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100\' height=\'100\' fill=\'%23eee\'/><text x=\'50%\' y=\'50%\' font-size=\'12\' text-anchor=\'middle\' alignment-baseline=\'middle\' fill=\'%23aaa\'>無圖片</text></svg>';"></div>` : 
+                        `<div class="img-wrapper" style="background:#eee;color:#aaa;font-size:11px;display:flex;align-items:center;justify-content:center;">無圖片</div>`;
+                    
                     let displayPrice = match.price;
                     if(!isNaN(displayPrice.trim())) {
                         displayPrice = `<span class="price-currency">HK$</span>${displayPrice}`;
