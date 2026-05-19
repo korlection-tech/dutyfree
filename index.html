@@ -131,9 +131,16 @@
         .close-btn {
             position: absolute; top: 15px; right: 20px; font-size: 28px;
             color: #aaa; cursor: pointer; border: none; background: none; font-weight: bold;
+            z-index: 10;
         }
         .close-btn:hover { color: #000; }
-        .modal-detail-img { width: 100%; max-height: 380px; object-fit: contain; background: #fafafa; margin-bottom: 15px; border-radius: 6px; }
+        .modal-detail-img { width: 100%; max-height: 380px; object-fit: contain; background: #fafafa; margin-bottom: 12px; border-radius: 6px; display: block; }
+        
+        /* 新增：多圖小縮圖外框 */
+        .thumb-container { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
+        .thumb-img { width: 60px; height: 60px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 4px; cursor: pointer; background: #fff; transition: border 0.2s; }
+        .thumb-img.active { border-color: #001f3f; }
+        
         .modal-brand { font-size: 13px; color: #001f3f; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
         .modal-title { font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 15px 0; line-height: 1.4; }
         .modal-price-box { background: #fff5f5; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
@@ -170,8 +177,11 @@
 
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
-        <button class="close-btn" onclick="closeModal(force=true)">&times;</button>
+        <button class="close-btn" onclick="closeModal(event, true)">&times;</button>
         <img src="" id="modalImg" class="modal-detail-img" alt="Product Detail" onerror="this.src='https://placehold.co/400x400?text=No+Detail+Image'">
+        
+        <div id="thumbContainer" class="thumb-container"></div>
+        
         <div id="modalBrand" class="modal-brand">BRAND</div>
         <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
         <div class="modal-price-box">
@@ -185,10 +195,7 @@
 let productsData = []; 
 
 document.addEventListener("DOMContentLoaded", function() {
-    // 💡 終極防快取延遲機制
     const cacheBuster = "?v=" + new Date().getTime();
-    
-    // 統一簡化數據庫檔名為 pricelist.csv
     const csvUrl = "pricelist.csv" + cacheBuster;
     
     Papa.parse(csvUrl, {
@@ -255,10 +262,12 @@ function performSearch() {
             const name = item["Product Name"] || "無品名";
             const price = item["Price (HKD)"] || "未定價";
             const imgUrl = item["Image"] || "";
+            // 獲取 detail 圖片字串
             const detailImgUrl = item["Detail Image"] && item["Detail Image"].trim() !== "" ? item["Detail Image"] : imgUrl;
             
             const card = document.createElement('div');
             card.className = 'card';
+            // 修改：把整串 detailImgUrl 傳進開窗 function 處理
             card.onclick = () => openModal(brand, name, price, detailImgUrl);
             
             card.innerHTML = `
@@ -278,14 +287,46 @@ function performSearch() {
     }
 }
 
-function openModal(brand, name, price, detailImg) {
-    document.getElementById('modalImg').src = detailImg;
+// 修改：支援單圖與多圖切換
+function openModal(brand, name, price, detailImgRaw) {
+    const mainImg = document.getElementById('modalImg');
+    const thumbContainer = document.getElementById('thumbContainer');
+    thumbContainer.innerHTML = ''; // 清空舊縮圖
+    
+    // 用逗號拆分網址
+    const imgList = detailImgRaw.split(',').map(url => url.trim()).filter(url => url !== "");
+    
+    // 設定第一張為主圖
+    mainImg.src = imgList[0];
+    
+    // 如果有多過一張相，就建立縮圖列表
+    if (imgList.length > 1) {
+        thumbContainer.style.display = 'flex';
+        imgList.forEach((url, idx) => {
+            const thumb = document.createElement('img');
+            thumb.className = 'thumb-img' + (idx === 0 ? ' active' : '');
+            thumb.src = url;
+            thumb.onerror = function() { this.src = 'https://placehold.co/60x60?text=Error'; };
+            
+            // 點擊縮圖切換主圖
+            thumb.onclick = function() {
+                mainImg.src = url;
+                document.querySelectorAll('.thumb-img').forEach(t => t.classList.remove('active'));
+                thumb.classList.add('active');
+            };
+            thumbContainer.appendChild(thumb);
+        });
+    } else {
+        thumbContainer.style.display = 'none'; // 只有一張相就隱藏縮圖區
+    }
+
     document.getElementById('modalBrand').innerText = brand;
     document.getElementById('modalTitle').innerText = name;
     document.getElementById('modalPrice').innerText = "HKD $" + price;
     document.getElementById('detailModal').classList.add('active');
 }
 
+// 修正：修正點 X 掣無效的問題
 function closeModal(event, force = false) {
     if (force || event.target.id === 'detailModal') {
         document.getElementById('detailModal').classList.remove('active');
