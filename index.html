@@ -22,7 +22,7 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
         
-        /* 頂部區塊：圓形 Logo 與標題 */
+        /* 頂部區塊 */
         .header-section {
             text-align: center;
             margin-bottom: 25px;
@@ -55,7 +55,7 @@
             font-weight: 500;
         }
         
-        /* 系統狀態提示列 (在背景自動載入時會顯示一下) */
+        /* 狀態提示列 */
         .status-message {
             text-align: center;
             padding: 12px;
@@ -67,7 +67,7 @@
         .status-loading { background: #fff3cd; color: #856404; }
         .status-error { background: #f8d7da; color: #721c24; }
 
-        /* 搜尋區 (預設直接顯示，不需手動解鎖) */
+        /* 搜尋區 */
         .search-box {
             background: #f8f9fa;
             padding: 20px;
@@ -84,7 +84,7 @@
         textarea:focus { border-color: #001f3f; outline: none; }
         .hint { font-size: 13px; color: #6c757d; margin-top: 8px; display: flex; justify-content: space-between; }
         
-        /* 按鈕：Navy 海軍藍 */
+        /* Navy 按鈕 */
         .btn-search {
             display: block; width: 100%; padding: 14px; 
             background-color: #001f3f; color: white;
@@ -95,11 +95,9 @@
         .btn-search:hover { background-color: #001124; }
         .btn-search:disabled { background-color: #a0aec0; cursor: not-allowed; }
 
-        /* 商品列表 Grid */
+        /* Grid 與卡片 */
         .results-count { margin-bottom: 15px; font-weight: bold; color: #2c3e50; font-size: 16px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
-        
-        /* 商品卡片 */
         .card {
             background: #fff; border: 1px solid #e1e8ed; border-radius: 8px; overflow: hidden;
             display: flex; flex-direction: column; padding: 15px; cursor: pointer;
@@ -116,7 +114,7 @@
         .no-result { text-align: center; color: #a0aec0; grid-column: 1 / -1; padding: 50px; font-size: 16px; }
         .click-tip { font-size: 11px; color: #3498db; text-align: right; margin-top: 2px; }
 
-        /* 產品細節圖彈出視窗 (Modal 燈箱) */
+        /* Modal 彈出視窗 */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
@@ -172,4 +170,128 @@
 
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
-        <button class="
+        <button class="close-btn" onclick="closeModal(force=true)">&times;</button>
+        <img src="" id="modalImg" class="modal-detail-img" alt="Product Detail" onerror="this.src='https://placehold.co/400x400?text=No+Detail+Image'">
+        <div id="modalBrand" class="modal-brand">BRAND</div>
+        <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
+        <div class="modal-price-box">
+            <span class="modal-price-label">免稅優惠價</span>
+            <span class="modal-price" id="modalPrice">HKD $0</span>
+        </div>
+    </div>
+</div>
+
+<script>
+let productsData = []; 
+
+document.addEventListener("DOMContentLoaded", function() {
+    // 💡 終極防快取延遲機制
+    const cacheBuster = "?v=" + new Date().getTime();
+    
+    // 統一簡化數據庫檔名為 pricelist.csv
+    const csvUrl = "pricelist.csv" + cacheBuster;
+    
+    Papa.parse(csvUrl, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            productsData = results.data;
+            document.getElementById("statusMessage").style.display = "none";
+            
+            const searchBtn = document.getElementById("searchBtn");
+            searchBtn.disabled = false;
+            searchBtn.innerText = "立即查詢價格";
+            console.log("成功讀取資料庫: " + csvUrl);
+        },
+        error: function(err) {
+            const statusDiv = document.getElementById("statusMessage");
+            statusDiv.className = "status-message status-error";
+            statusDiv.innerText = "❌ 錯誤：找不到 pricelist.csv 資料庫檔案。請確保檔名為小寫 pricelist.csv，並與 index.html 放喺 GitHub 嘅同一個根目錄資料夾。";
+        }
+    });
+});
+
+document.getElementById('searchInput').addEventListener('input', function() {
+    let keywords = parseKeywords(this.value);
+    let hint = document.getElementById('brandCountHint');
+    hint.innerText = `已輸入: ${keywords.length} 個關鍵字 / 上限 10 個`;
+    hint.style.color = keywords.length > 10 ? '#e53e3e' : '#6c757d';
+    hint.style.fontWeight = keywords.length > 10 ? 'bold' : 'normal';
+});
+
+function parseKeywords(text) {
+    if (!text.trim()) return [];
+    return text.split(/[\n,，\s]+/).filter(k => k.trim() !== "");
+}
+
+function performSearch() {
+    const rawInput = document.getElementById('searchInput').value;
+    let keywords = parseKeywords(rawInput);
+    
+    if (keywords.length === 0) { alert("請至少輸入一個品牌或關鍵字。"); return; }
+    if (keywords.length > 10) { alert("⚠️ 每次最多只能同時查詢 10 個品牌/關鍵字！\n系統將自動抓取前 10 個進行搜尋。"); keywords = keywords.slice(0, 10); }
+    
+    const grid = document.getElementById('resultsGrid');
+    const countDiv = document.getElementById('resultsCount');
+    grid.innerHTML = ''; 
+    
+    const filtered = productsData.filter(product => {
+        return keywords.some(keyword => {
+            const k = keyword.toLowerCase().trim();
+            const brandMatch = product["Brand"] ? product["Brand"].toLowerCase().includes(k) : false;
+            const nameMatch = product["Product Name"] ? product["Product Name"].toLowerCase().includes(k) : false;
+            return brandMatch || nameMatch;
+        });
+    });
+    
+    countDiv.innerText = `🔍 找到 ${filtered.length} 筆相關商品 (基於 ${keywords.length} 個關鍵字：${keywords.join(', ')})`;
+    
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div class="no-result">沒有找到相符的商品，請檢查拼字或更換關鍵字。</div>';
+    } else {
+        filtered.forEach((item, index) => {
+            const brand = item["Brand"] || "Unknown";
+            const name = item["Product Name"] || "無品名";
+            const price = item["Price (HKD)"] || "未定價";
+            const imgUrl = item["Image"] || "";
+            const detailImgUrl = item["Detail Image"] && item["Detail Image"].trim() !== "" ? item["Detail Image"] : imgUrl;
+            
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.onclick = () => openModal(brand, name, price, detailImgUrl);
+            
+            card.innerHTML = `
+                <div class="image-container">
+                    <img src="${imgUrl}" alt="${name}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
+                </div>
+                <div class="brand-badge">${brand}</div>
+                <div class="product-name" title="${name}">${name}</div>
+                <div class="price-wrapper">
+                    <span class="price-label">價格</span>
+                    <span class="price">HKD $${price}</span>
+                </div>
+                <div class="click-tip">🔍 點擊看細節</div>
+            `;
+            grid.appendChild(card);
+        });
+    }
+}
+
+function openModal(brand, name, price, detailImg) {
+    document.getElementById('modalImg').src = detailImg;
+    document.getElementById('modalBrand').innerText = brand;
+    document.getElementById('modalTitle').innerText = name;
+    document.getElementById('modalPrice').innerText = "HKD $" + price;
+    document.getElementById('detailModal').classList.add('active');
+}
+
+function closeModal(event, force = false) {
+    if (force || event.target.id === 'detailModal') {
+        document.getElementById('detailModal').classList.remove('active');
+    }
+}
+</script>
+
+</body>
+</html>
