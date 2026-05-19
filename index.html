@@ -114,7 +114,7 @@
         .no-result { text-align: center; color: #a0aec0; grid-column: 1 / -1; padding: 50px; font-size: 16px; }
         .click-tip { font-size: 11px; color: #3498db; text-align: right; margin-top: 2px; }
 
-        /* Modal 彈出視窗（已優化長圖滾動） */
+        /* Modal 彈出視窗（基底基礎結構） */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
@@ -123,25 +123,54 @@
         }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
         
+        /* 🛠️ 核心修改 1：設定一個相對定位包裹框，方便 X 按鈕相對它做絕對定位，令 X 可以完美貼在白框右上角 */
+        .modal-wrapper {
+            position: relative;
+            width: 90%;
+            max-width: 550px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+
         .modal-content {
-            background: #fff; width: 90%; max-width: 600px; max-height: 85vh;
-            border-radius: 12px; padding: 25px; position: relative; 
-            overflow-y: auto; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: scale(0.8); transition: transform 0.3s ease;
+            background: #fff; 
+            width: 100%;
+            height: 100%;
+            border-radius: 12px; 
+            padding: 25px; 
+            overflow-y: auto; /* 內容過長時自己內部出捲軸 */
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
+            transform: scale(0.8); 
+            transition: transform 0.3s ease;
+            box-sizing: border-box;
         }
         .modal-overlay.active .modal-content { transform: scale(1); }
         
-        /* 懸浮固定的關閉按鈕 */
+        /* 🛠️ 核心修改 2：將 X 關閉按鈕懸浮固定在白框的右上角，就算內容點樣碌，它都雷打不動留在原位 */
         .close-btn {
-            position: absolute; top: 15px; right: 20px; font-size: 32px;
-            color: #666; cursor: pointer; border: none; background: rgba(255,255,255,0.9); 
-            font-weight: bold; width: 40px; height: 40px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 99;
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            font-size: 30px;
+            color: #666; 
+            cursor: pointer; 
+            border: none; 
+            background: rgba(255, 255, 255, 0.85); /* 半透明白底，防止擋住圖或字時看得很辛苦 */
+            font-weight: bold; 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 50%;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
+            z-index: 10000; /* 確保疊在最上層 */
+            transition: background 0.2s, color 0.2s;
         }
         .close-btn:hover { color: #000; background: #fff; }
         
-        /* 長圖自動 100% 寬度放大放大 */
+        /* 長圖優化：自動 100% 寬度放大，高度按原比例拉長 */
         .modal-detail-img { 
             width: 100%; 
             height: auto; 
@@ -151,12 +180,12 @@
             display: block;
         }
         
-        /* 多圖小縮圖外框 */
+        /* 多圖支援小縮圖 */
         .thumb-container { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
         .thumb-img { width: 60px; height: 60px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 4px; cursor: pointer; background: #fff; transition: border 0.2s; }
         .thumb-img.active { border-color: #001f3f; }
         
-        .modal-brand { font-size: 13px; color: #001f3f; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; margin-top: 10px; }
+        .modal-brand { font-size: 13px; color: #001f3f; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; margin-top: 5px; }
         .modal-title { font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 15px 0; line-height: 1.4; }
         .modal-price-box { background: #fff5f5; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
         .modal-price-label { font-size: 14px; color: #c53030; font-weight: 600; }
@@ -191,19 +220,23 @@
 </div>
 
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-wrapper" onclick="event.stopPropagation()">
+        
         <button class="close-btn" onclick="closeModal(event, true)">&times;</button>
         
-        <img src="" id="modalImg" class="modal-detail-img" alt="Product Detail" onerror="this.src='https://placehold.co/400x400?text=No+Detail+Image'">
-        
-        <div id="thumbContainer" class="thumb-container"></div>
-        
-        <div id="modalBrand" class="modal-brand">BRAND</div>
-        <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
-        <div class="modal-price-box">
-            <span class="modal-price-label">免稅優惠價</span>
-            <span class="modal-price" id="modalPrice">HKD $0</span>
+        <div class="modal-content">
+            <img src="" id="modalImg" class="modal-detail-img" alt="Product Detail" onerror="this.src='https://placehold.co/400x400?text=No+Detail+Image'">
+            
+            <div id="thumbContainer" class="thumb-container"></div>
+            
+            <div id="modalBrand" class="modal-brand">BRAND</div>
+            <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
+            <div class="modal-price-box">
+                <span class="modal-price-label">免稅優惠價</span>
+                <span class="modal-price" id="modalPrice">HKD $0</span>
+            </div>
         </div>
+        
     </div>
 </div>
 
@@ -213,7 +246,6 @@ let productsData = [];
 document.addEventListener("DOMContentLoaded", function() {
     const cacheBuster = "?v=" + new Date().getTime();
     
-    // 💡 內建四重容錯檔名，確保無論你 GitHub 上寫哪一個名字，網站都一定抓得到
     const possibleNames = [
         "pricelist.csv" + cacheBuster,
         "Duty Free Pricelist.csv" + cacheBuster,
@@ -227,7 +259,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (attemptIndex >= possibleNames.length) {
             const statusDiv = document.getElementById("statusMessage");
             statusDiv.className = "status-message status-error";
-            statusDiv.innerText = "❌ 錯誤：找不到您的 CSV 資料庫檔案。請確保資料庫檔案已上傳至 index.html 同一個資料夾。";
+            statusDiv.innerText = "❌ 錯誤：找不到您的 CSV 資料庫檔案。請確保資料庫與 index.html 放喺 GitHub 嘅同一個根目錄資料夾。";
             return;
         }
 
@@ -355,6 +387,7 @@ function openModal(brand, name, price, detailImgRaw) {
     const modal = document.getElementById('detailModal');
     modal.classList.add('active');
     
+    // 每次打開新視窗時，自動把滾動條推回最頂部
     document.querySelector('.modal-content').scrollTop = 0;
 }
 
