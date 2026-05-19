@@ -114,7 +114,7 @@
         .no-result { text-align: center; color: #a0aec0; grid-column: 1 / -1; padding: 50px; font-size: 16px; }
         .click-tip { font-size: 11px; color: #3498db; text-align: right; margin-top: 2px; }
 
-        /* Modal 彈出視窗 */
+        /* Modal 彈出視窗（已優化長圖滾動） */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
@@ -122,217 +122,34 @@
             transition: opacity 0.3s ease;
         }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        
         .modal-content {
-            background: #fff; width: 90%; max-width: 550px; max-height: 90vh;
-            border-radius: 12px; padding: 25px; position: relative; overflow-y: auto;
+            background: #fff; width: 90%; max-width: 600px; max-height: 85vh;
+            border-radius: 12px; padding: 25px; position: relative; 
+            overflow-y: auto; /* 當圖片好長嗰陣，等個視窗自己出滾動條 */
             box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: scale(0.8); transition: transform 0.3s ease;
         }
         .modal-overlay.active .modal-content { transform: scale(1); }
+        
+        /* 懸浮固定的關閉按鈕，等用家拉到好落都隨時撳到關閉 */
         .close-btn {
-            position: absolute; top: 15px; right: 20px; font-size: 28px;
-            color: #aaa; cursor: pointer; border: none; background: none; font-weight: bold;
-            z-index: 10;
+            position: absolute; top: 15px; right: 20px; font-size: 32px;
+            color: #666; cursor: pointer; border: none; background: rgba(255,255,255,0.9); 
+            font-weight: bold; width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 99;
         }
-        .close-btn:hover { color: #000; }
-        .modal-detail-img { width: 100%; max-height: 380px; object-fit: contain; background: #fafafa; margin-bottom: 12px; border-radius: 6px; display: block; }
+        .close-btn:hover { color: #000; background: #fff; }
         
-        /* 新增：多圖小縮圖外框 */
-        .thumb-container { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
-        .thumb-img { width: 60px; height: 60px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 4px; cursor: pointer; background: #fff; transition: border 0.2s; }
-        .thumb-img.active { border-color: #001f3f; }
-        
-        .modal-brand { font-size: 13px; color: #001f3f; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
-        .modal-title { font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 15px 0; line-height: 1.4; }
-        .modal-price-box { background: #fff5f5; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .modal-price-label { font-size: 14px; color: #c53030; font-weight: 600; }
-        .modal-price { font-size: 24px; color: #e53e3e; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    
-    <div class="header-section">
-        <img src="logo.png" alt="Company Logo" class="company-logo" onerror="this.style.display='none'">
-        <h1>韓國免稅店代購 (3 - 7 Jun 2026)</h1>
-        <div class="subtitle">每次最多可同時查詢 10 個品牌</div>
-        <p class="notice-text">*價格可能會因免稅店的促銷優惠而有所變動，請於落單前與店主確認價格</p>
-    </div>
-    
-    <div id="statusMessage" class="status-message status-loading">⏳ 正在連線讀取免稅店產品資料庫，請稍候...</div>
-
-    <div class="search-box">
-        <label for="searchInput">請輸入查詢關鍵字（多個請用「空格」或「換行」隔開）：</label>
-        <textarea id="searchInput" placeholder="例如輸入: 2AN AMUSE"></textarea>
-        <div class="hint">
-            <span id="brandCountHint">已輸入: 0 個關鍵字 / 上限 10 個</span>
-            <span>支援同時查詢最多 10 個品牌</span>
-        </div>
-        <button class="btn-search" id="searchBtn" onclick="performSearch()" disabled>請稍候...</button>
-    </div>
-
-    <div class="results-count" id="resultsCount"></div>
-    <div class="grid" id="resultsGrid"></div>
-</div>
-
-<div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-        <button class="close-btn" onclick="closeModal(event, true)">&times;</button>
-        <img src="" id="modalImg" class="modal-detail-img" alt="Product Detail" onerror="this.src='https://placehold.co/400x400?text=No+Detail+Image'">
-        
-        <div id="thumbContainer" class="thumb-container"></div>
-        
-        <div id="modalBrand" class="modal-brand">BRAND</div>
-        <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
-        <div class="modal-price-box">
-            <span class="modal-price-label">免稅優惠價</span>
-            <span class="modal-price" id="modalPrice">HKD $0</span>
-        </div>
-    </div>
-</div>
-
-<script>
-let productsData = []; 
-
-document.addEventListener("DOMContentLoaded", function() {
-    const cacheBuster = "?v=" + new Date().getTime();
-    const csvUrl = "pricelist.csv" + cacheBuster;
-    
-    Papa.parse(csvUrl, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-            productsData = results.data;
-            document.getElementById("statusMessage").style.display = "none";
-            
-            const searchBtn = document.getElementById("searchBtn");
-            searchBtn.disabled = false;
-            searchBtn.innerText = "立即查詢價格";
-            console.log("成功讀取資料庫: " + csvUrl);
-        },
-        error: function(err) {
-            const statusDiv = document.getElementById("statusMessage");
-            statusDiv.className = "status-message status-error";
-            statusDiv.innerText = "❌ 錯誤：找不到 pricelist.csv 資料庫檔案。請確保檔名為小寫 pricelist.csv，並與 index.html 放喺 GitHub 嘅同一個根目錄資料夾。";
+        /* 🛠️ 核心修改：移除 max-height 限制，等長圖可以自動 100% 寬度放大放大 */
+        .modal-detail-img { 
+            width: 100%; 
+            height: auto; /* 寬度 100% 填滿，高度自動等比例拉長，唔會再縮埋一舊 */
+            background: #fafafa; 
+            margin-bottom: 15px; 
+            border-radius: 6px; 
+            display: block;
         }
-    });
-});
-
-document.getElementById('searchInput').addEventListener('input', function() {
-    let keywords = parseKeywords(this.value);
-    let hint = document.getElementById('brandCountHint');
-    hint.innerText = `已輸入: ${keywords.length} 個關鍵字 / 上限 10 個`;
-    hint.style.color = keywords.length > 10 ? '#e53e3e' : '#6c757d';
-    hint.style.fontWeight = keywords.length > 10 ? 'bold' : 'normal';
-});
-
-function parseKeywords(text) {
-    if (!text.trim()) return [];
-    return text.split(/[\n,，\s]+/).filter(k => k.trim() !== "");
-}
-
-function performSearch() {
-    const rawInput = document.getElementById('searchInput').value;
-    let keywords = parseKeywords(rawInput);
-    
-    if (keywords.length === 0) { alert("請至少輸入一個品牌或關鍵字。"); return; }
-    if (keywords.length > 10) { alert("⚠️ 每次最多只能同時查詢 10 個品牌/關鍵字！\n系統將自動抓取前 10 個進行搜尋。"); keywords = keywords.slice(0, 10); }
-    
-    const grid = document.getElementById('resultsGrid');
-    const countDiv = document.getElementById('resultsCount');
-    grid.innerHTML = ''; 
-    
-    const filtered = productsData.filter(product => {
-        return keywords.some(keyword => {
-            const k = keyword.toLowerCase().trim();
-            const brandMatch = product["Brand"] ? product["Brand"].toLowerCase().includes(k) : false;
-            const nameMatch = product["Product Name"] ? product["Product Name"].toLowerCase().includes(k) : false;
-            return brandMatch || nameMatch;
-        });
-    });
-    
-    countDiv.innerText = `🔍 找到 ${filtered.length} 筆相關商品 (基於 ${keywords.length} 個關鍵字：${keywords.join(', ')})`;
-    
-    if (filtered.length === 0) {
-        grid.innerHTML = '<div class="no-result">沒有找到相符的商品，請檢查拼字或更換關鍵字。</div>';
-    } else {
-        filtered.forEach((item, index) => {
-            const brand = item["Brand"] || "Unknown";
-            const name = item["Product Name"] || "無品名";
-            const price = item["Price (HKD)"] || "未定價";
-            const imgUrl = item["Image"] || "";
-            // 獲取 detail 圖片字串
-            const detailImgUrl = item["Detail Image"] && item["Detail Image"].trim() !== "" ? item["Detail Image"] : imgUrl;
-            
-            const card = document.createElement('div');
-            card.className = 'card';
-            // 修改：把整串 detailImgUrl 傳進開窗 function 處理
-            card.onclick = () => openModal(brand, name, price, detailImgUrl);
-            
-            card.innerHTML = `
-                <div class="image-container">
-                    <img src="${imgUrl}" alt="${name}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
-                </div>
-                <div class="brand-badge">${brand}</div>
-                <div class="product-name" title="${name}">${name}</div>
-                <div class="price-wrapper">
-                    <span class="price-label">價格</span>
-                    <span class="price">HKD $${price}</span>
-                </div>
-                <div class="click-tip">🔍 點擊看細節</div>
-            `;
-            grid.appendChild(card);
-        });
-    }
-}
-
-// 修改：支援單圖與多圖切換
-function openModal(brand, name, price, detailImgRaw) {
-    const mainImg = document.getElementById('modalImg');
-    const thumbContainer = document.getElementById('thumbContainer');
-    thumbContainer.innerHTML = ''; // 清空舊縮圖
-    
-    // 用逗號拆分網址
-    const imgList = detailImgRaw.split(',').map(url => url.trim()).filter(url => url !== "");
-    
-    // 設定第一張為主圖
-    mainImg.src = imgList[0];
-    
-    // 如果有多過一張相，就建立縮圖列表
-    if (imgList.length > 1) {
-        thumbContainer.style.display = 'flex';
-        imgList.forEach((url, idx) => {
-            const thumb = document.createElement('img');
-            thumb.className = 'thumb-img' + (idx === 0 ? ' active' : '');
-            thumb.src = url;
-            thumb.onerror = function() { this.src = 'https://placehold.co/60x60?text=Error'; };
-            
-            // 點擊縮圖切換主圖
-            thumb.onclick = function() {
-                mainImg.src = url;
-                document.querySelectorAll('.thumb-img').forEach(t => t.classList.remove('active'));
-                thumb.classList.add('active');
-            };
-            thumbContainer.appendChild(thumb);
-        });
-    } else {
-        thumbContainer.style.display = 'none'; // 只有一張相就隱藏縮圖區
-    }
-
-    document.getElementById('modalBrand').innerText = brand;
-    document.getElementById('modalTitle').innerText = name;
-    document.getElementById('modalPrice').innerText = "HKD $" + price;
-    document.getElementById('detailModal').classList.add('active');
-}
-
-// 修正：修正點 X 掣無效的問題
-function closeModal(event, force = false) {
-    if (force || event.target.id === 'detailModal') {
-        document.getElementById('detailModal').classList.remove('active');
-    }
-}
-</script>
-
-</body>
-</html>
+        
+        /* 多圖小縮圖外框 */
+        .thumb-container { display: flex; gap: 8px; margin-bottom: 15px; overflow-x
