@@ -7,7 +7,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", 微软雅黑, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Microsoft JhengHei", sans-serif;
             background-color: #f4f6f9;
             margin: 0;
             padding: 20px;
@@ -38,9 +38,10 @@
         }
         h1 {
             color: #1a1a1a;
-            margin: 0 0 8px 0;
-            font-size: 28px;
+            margin: 0 0 12px 0;
+            font-size: 26px;
             font-weight: 700;
+            line-height: 1.4;
         }
         .subtitle {
             color: #4a5568;
@@ -82,7 +83,7 @@
             font-family: inherit;
         }
         textarea:focus { border-color: #001f3f; outline: none; }
-        .hint { font-size: 13px; color: #6c757d; margin-top: 8px; display: flex; justify-content: space-between; }
+        .hint { font-size: 13px; color: #6c757d; margin-top: 8px; }
         
         /* Navy 按鈕 */
         .btn-search {
@@ -95,7 +96,7 @@
         .btn-search:hover { background-color: #001124; }
         .btn-search:disabled { background-color: #a0aec0; cursor: not-allowed; }
 
-        /* Grid 與卡片 */
+        /* Grid 與商品卡片 */
         .results-count { margin-bottom: 15px; font-weight: bold; color: #2c3e50; font-size: 16px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         .card {
@@ -114,7 +115,7 @@
         .no-result { text-align: center; color: #a0aec0; grid-column: 1 / -1; padding: 50px; font-size: 16px; }
         .click-tip { font-size: 11px; color: #3498db; text-align: right; margin-top: 2px; }
 
-        /* Modal 彈出視窗（固定 X 關閉按鈕，優化長圖滾動） */
+        /* Modal 彈出視窗（升級：專門用作無縫拼接長圖） */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
@@ -122,66 +123,38 @@
             transition: opacity 0.3s ease;
         }
         .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        
-        .modal-wrapper {
-            position: relative;
-            width: 90%;
-            max-width: 550px;
-            max-height: 85vh;
-            display: flex;
-            flex-direction: column;
-        }
-
         .modal-content {
-            background: #fff; 
-            width: 100%;
-            height: 100%;
-            border-radius: 12px; 
-            padding: 25px; 
-            overflow-y: auto; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2); 
-            transform: scale(0.8); 
-            transition: transform 0.3s ease;
-            box-sizing: border-box;
+            background: #fff; width: 90%; max-width: 600px; max-height: 90vh;
+            border-radius: 12px; padding: 25px; position: relative; overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2); transform: scale(0.8); transition: transform 0.3s ease;
         }
         .modal-overlay.active .modal-content { transform: scale(1); }
-        
         .close-btn {
-            position: absolute; 
-            top: 15px; 
-            right: 15px; 
-            font-size: 30px;
-            color: #666; 
-            cursor: pointer; 
-            border: none; 
-            background: rgba(255, 255, 255, 0.85); 
-            font-weight: bold; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 50%;
-            display: flex; 
-            align-items: center; 
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15); 
-            z-index: 10000; 
-            transition: background 0.2s, color 0.2s;
+            position: absolute; top: 15px; right: 20px; font-size: 28px;
+            color: #aaa; cursor: pointer; border: none; background: none; font-weight: bold; z-index: 10;
         }
-        .close-btn:hover { color: #000; background: #fff; }
+        .close-btn:hover { color: #000; }
         
-        .modal-detail-img { 
-            width: 100%; 
-            height: auto; 
-            background: #fafafa; 
-            margin-bottom: 15px; 
-            border-radius: 6px; 
-            display: block;
+        /* 💡 核心優化：多張圖自動垂直無縫黏合嘅超強容器 */
+        .modal-image-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            background: #fafafa;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .modal-image-container img {
+            width: 100%;
+            height: auto;
+            display: block;  /* 消除圖片底部的預設微小間隙 */
+            margin: 0;
+            padding: 0;
+            border: none;
         }
         
-        .thumb-container { display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px; }
-        .thumb-img { width: 60px; height: 60px; object-fit: contain; border: 2px solid #e2e8f0; border-radius: 4px; cursor: pointer; background: #fff; transition: border 0.2s; }
-        .thumb-img.active { border-color: #001f3f; }
-        
-        .modal-brand { font-size: 13px; color: #001f3f; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; margin-top: 5px; }
+        .modal-brand { font-size: 13px; color: #001f3f; font-weight: bold; text-transform: uppercase; margin-bottom: 5px; }
         .modal-title { font-size: 18px; font-weight: bold; color: #1a1a1a; margin: 0 0 15px 0; line-height: 1.4; }
         .modal-price-box { background: #fff5f5; padding: 12px 15px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
         .modal-price-label { font-size: 14px; color: #c53030; font-weight: 600; }
@@ -191,10 +164,9 @@
 <body>
 
 <div class="container">
-    
     <div class="header-section">
         <img src="logo.png" alt="Company Logo" class="company-logo" onerror="this.style.display='none'">
-        <h1>韓國免稅店代購 (3 - 7 Jun 2026)</h1>
+        <h1>韓國免稅店代購<br>(3 - 7 Jun 2026)</h1>
         <div class="subtitle">每次最多可同時查詢 10 個品牌</div>
         <p class="notice-text">*價格可能會因免稅店的促銷優惠而有所變動，請於落單前與店主確認價格</p>
     </div>
@@ -206,7 +178,6 @@
         <textarea id="searchInput" placeholder="例如輸入: 2AN AMUSE"></textarea>
         <div class="hint">
             <span id="brandCountHint">已輸入: 0 個關鍵字 / 上限 10 個</span>
-            <span>支援同時查詢最多 10 個品牌</span>
         </div>
         <button class="btn-search" id="searchBtn" onclick="performSearch()" disabled>請稍候...</button>
     </div>
@@ -216,19 +187,16 @@
 </div>
 
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
-    <div class="modal-wrapper" onclick="event.stopPropagation()">
-        <button class="close-btn" onclick="closeModal(event, true)">&times;</button>
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="close-btn" onclick="closeModal(force=true)">&times;</button>
         
-        <div class="modal-content">
-            <img src="" id="modalImg" class="modal-detail-img" alt="Product Detail" onerror="this.src='https://placehold.co/400x400?text=No+Detail+Image'">
-            <div id="thumbContainer" class="thumb-container"></div>
-            
-            <div id="modalBrand" class="modal-brand">BRAND</div>
-            <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
-            <div class="modal-price-box">
-                <span class="modal-price-label">免稅優惠價</span>
-                <span class="modal-price" id="modalPrice">HKD $0</span>
-            </div>
+        <div class="modal-image-container" id="modalImgContainer"></div>
+        
+        <div id="modalBrand" class="modal-brand">BRAND</div>
+        <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
+        <div class="modal-price-box">
+            <span class="modal-price-label">免稅優惠價</span>
+            <span class="modal-price" id="modalPrice">HKD $0</span>
         </div>
     </div>
 </div>
@@ -240,10 +208,10 @@ document.addEventListener("DOMContentLoaded", function() {
     const cacheBuster = "?v=" + new Date().getTime();
     
     const possibleNames = [
-        "pricelist.csv" + cacheBuster,
+        "Duty Free Pricelist.csv.csv" + cacheBuster,
+        "Duty%20Free%20Pricelist.csv.csv" + cacheBuster,
         "Duty Free Pricelist.csv" + cacheBuster,
-        "Duty%20Free%20Pricelist.csv" + cacheBuster,
-        "Duty Free Pricelist.csv.csv" + cacheBuster
+        "Duty%20Free%20Pricelist.csv" + cacheBuster
     ];
     
     let attemptIndex = 0;
@@ -262,11 +230,6 @@ document.addEventListener("DOMContentLoaded", function() {
             download: true,
             header: true,
             skipEmptyLines: true,
-            // 💡 新增容錯設定：自動清除欄位前後的多餘空白鍵
-            trimHeaders: true,
-            transform: function(value) {
-                return value.trim();
-            },
             complete: function(results) {
                 productsData = results.data;
                 document.getElementById("statusMessage").style.display = "none";
@@ -324,8 +287,7 @@ function performSearch() {
     if (filtered.length === 0) {
         grid.innerHTML = '<div class="no-result">沒有找到相符的商品，請檢查拼字或更換關鍵字。</div>';
     } else {
-        filtered.forEach((item, index) => {
-            // 💡 容錯處理：確保讀取時能對應到欄位
+        filtered.forEach(item => {
             const brand = item["Brand"] || "Unknown";
             const name = item["Product Name"] || "無品名";
             const price = item["Price (HKD)"] || "未定價";
@@ -353,32 +315,29 @@ function performSearch() {
     }
 }
 
-// 💡 修正變數名稱不一致的問題，並支援多圖切換
+// 💡 核心優化：自動拆解分開嘅圖片連結，並無縫直排拼埋一齊
 function openModal(brand, name, price, detailImgRaw) {
-    const mainImg = document.getElementById('modalImg');
-    const thumbContainer = document.getElementById('thumbContainer');
-    thumbContainer.innerHTML = ''; 
+    const container = document.getElementById('modalImgContainer');
+    container.innerHTML = ''; // 先清空上次打開嘅舊圖
     
+    // 如果欄位包含分號或逗號，將其統一用逗號拆開成陣列
     const imgList = detailImgRaw.split(';').join(',').split(',').map(url => url.trim()).filter(url => url !== "");
-    mainImg.src = imgList[0];
     
-    if (imgList.length > 1) {
-        thumbContainer.style.display = 'flex';
-        imgList.forEach((url, idx) => {
-            const thumb = document.createElement('img');
-            thumb.className = 'thumb-img' + (idx === 0 ? ' active' : '');
-            thumb.src = url;
-            thumb.onerror = function() { this.src = 'https://placehold.co/60x60?text=Error'; };
-            thumb.onclick = function() {
-                mainImg.src = url;
-                document.querySelectorAll('.thumb-img').forEach(t => t.classList.remove('active'));
-                thumb.classList.add('active');
-            };
-            thumbContainer.appendChild(thumb);
-        });
-    } else {
-        thumbContainer.style.display = 'none';
-    }
+    // 用迴圈將每一張圖都生成出嚟，排隊塞入容器
+    imgList.forEach((url, index) => {
+        const img = document.createElement('img');
+        img.src = url;
+        
+        // 防呆防死鏈：如果是單張圖壞左，顯示預設圖；如果是 10 張入面其中張壞左，直接隱藏唔影嚮整體
+        img.onerror = function() {
+            if (imgList.length === 1) {
+                this.src = 'https://placehold.co/400x400?text=No+Detail+Image';
+            } else {
+                this.style.display = 'none';
+            }
+        };
+        container.appendChild(img);
+    });
 
     document.getElementById('modalBrand').innerText = brand;
     document.getElementById('modalTitle').innerText = name;
@@ -387,6 +346,7 @@ function openModal(brand, name, price, detailImgRaw) {
     const modal = document.getElementById('detailModal');
     modal.classList.add('active');
     
+    // 每次打開彈出視窗時，自動將捲軸拉返去最頂
     document.querySelector('.modal-content').scrollTop = 0;
 }
 
