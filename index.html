@@ -115,7 +115,7 @@
         .no-result { text-align: center; color: #a0aec0; grid-column: 1 / -1; padding: 50px; font-size: 16px; }
         .click-tip { font-size: 11px; color: #3498db; text-align: right; margin-top: 2px; }
 
-        /* Modal 彈出視窗（升級：專門用作無縫拼接長圖） */
+        /* Modal 彈出視窗（無縫拼接長圖） */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center;
@@ -135,7 +135,6 @@
         }
         .close-btn:hover { color: #000; }
         
-        /* 💡 核心優化：多張圖自動垂直無縫黏合嘅超強容器 */
         .modal-image-container {
             display: flex;
             flex-direction: column;
@@ -148,7 +147,7 @@
         .modal-image-container img {
             width: 100%;
             height: auto;
-            display: block;  /* 消除圖片底部的預設微小間隙 */
+            display: block;
             margin: 0;
             padding: 0;
             border: none;
@@ -189,9 +188,7 @@
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
         <button class="close-btn" onclick="closeModal(force=true)">&times;</button>
-        
         <div class="modal-image-container" id="modalImgContainer"></div>
-        
         <div id="modalBrand" class="modal-brand">BRAND</div>
         <h2 id="modalTitle" class="modal-title">產品名稱項目</h2>
         <div class="modal-price-box">
@@ -205,11 +202,12 @@
 let productsData = []; 
 
 document.addEventListener("DOMContentLoaded", function() {
+    // 加上時間戳，防止瀏覽器快取舊資料
     const cacheBuster = "?v=" + new Date().getTime();
     
+    // 💡 修正：把 pricelist.csv 加進去讀取清單的首位
     const possibleNames = [
-        "Duty Free Pricelist.csv.csv" + cacheBuster,
-        "Duty%20Free%20Pricelist.csv.csv" + cacheBuster,
+        "pricelist.csv" + cacheBuster,
         "Duty Free Pricelist.csv" + cacheBuster,
         "Duty%20Free%20Pricelist.csv" + cacheBuster
     ];
@@ -220,7 +218,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (attemptIndex >= possibleNames.length) {
             const statusDiv = document.getElementById("statusMessage");
             statusDiv.className = "status-message status-error";
-            statusDiv.innerText = "❌ 錯誤：找不到您的 CSV 資料庫檔案。請確保資料庫與 index.html 放喺 GitHub 嘅同一個根目錄資料夾。";
+            statusDiv.innerText = "❌ 錯誤：找不到您的 CSV 資料庫檔案。請確保資料庫檔案（如 pricelist.csv）與 index.html 放喺 GitHub 嘅同一個根目錄資料夾。";
             return;
         }
 
@@ -315,20 +313,16 @@ function performSearch() {
     }
 }
 
-// 💡 核心優化：自動拆解分開嘅圖片連結，並無縫直排拼埋一齊
 function openModal(brand, name, price, detailImgRaw) {
     const container = document.getElementById('modalImgContainer');
-    container.innerHTML = ''; // 先清空上次打開嘅舊圖
+    container.innerHTML = ''; 
     
-    // 如果欄位包含分號或逗號，將其統一用逗號拆開成陣列
     const imgList = detailImgRaw.split(';').join(',').split(',').map(url => url.trim()).filter(url => url !== "");
     
-    // 用迴圈將每一張圖都生成出嚟，排隊塞入容器
     imgList.forEach((url, index) => {
         const img = document.createElement('img');
         img.src = url;
         
-        // 防呆防死鏈：如果是單張圖壞左，顯示預設圖；如果是 10 張入面其中張壞左，直接隱藏唔影嚮整體
         img.onerror = function() {
             if (imgList.length === 1) {
                 this.src = 'https://placehold.co/400x400?text=No+Detail+Image';
@@ -346,7 +340,6 @@ function openModal(brand, name, price, detailImgRaw) {
     const modal = document.getElementById('detailModal');
     modal.classList.add('active');
     
-    // 每次打開彈出視窗時，自動將捲軸拉返去最頂
     document.querySelector('.modal-content').scrollTop = 0;
 }
 
