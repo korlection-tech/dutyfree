@@ -109,44 +109,43 @@
 
         /* 📸 隱藏繪圖渲染區 (1080x1080 IG 格式) */
         #renderCanvasHidden {
-            position: absolute; left: -9999px; top: -9999px; width: 1080px; height: 1080px; background: #fff;
+            position: absolute; left: -9999px; top: -9999px; width: 1080px; height: 1080px; background: #ffffff;
         }
         .ig-poster-1080 {
-            width: 1080px; height: 1080px; background: #fff; position: relative; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; box-sizing: border-box;
+            width: 1080px; height: 1080px; background: #ffffff; position: relative; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; box-sizing: border-box;
         }
-        .ig-grid-item { position: relative; width: 100%; height: 100%; overflow: hidden; background: #ffffff; border: 2px solid #f2f2f2; box-sizing: border-box; }
+        .ig-grid-item { position: relative; width: 100%; height: 100%; overflow: hidden; background: #ffffff; border: 1px solid #f0f0f0; box-sizing: border-box; }
         .ig-grid-item img { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 1. 產品名稱排版：純白底色 + 黑色字體，支援多行與自動字型調節 */
+        /* 1. 產品名稱排版：純白底色 + 黑色字體 (完全移除陰影以防變灰色) */
         .ig-tag-title {
             position: absolute; top: 20px; left: 20px; right: 20px;
-            background: #ffffff; color: #000000;
-            padding: 8px 14px; border-radius: 8px;
+            background-color: #ffffff !important; color: #000000 !important;
+            padding: 8px 12px; border-radius: 6px;
             font-size: 24px; font-weight: bold; line-height: 1.25;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-            border: 1px solid #eeeeee;
+            box-shadow: none !important; border: none !important;
             word-wrap: break-word; word-break: break-word;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
         }
         
-        /* 2. 價錢：正下方中間 + 純白底色 + 黑色大字體 */
+        /* 2. 價錢：正下方中間 + 純白底色 + 黑色大字體 (完全移除陰影) */
         .ig-tag-price {
             position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
-            background: #ffffff; color: #000000;
-            padding: 6px 24px; border-radius: 12px;
+            background-color: #ffffff !important; color: #000000 !important;
+            padding: 6px 20px; border-radius: 8px;
             font-size: 38px; font-weight: 900;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: none !important; border: none !important;
             text-align: center; white-space: nowrap; line-height: 1.2;
-            border: 1px solid #eeeeee;
         }
 
         /* 3. 中間品牌名：單一粉紅色背景 */
         .ig-center-brand {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            background: #f19da9; color: white;
+            background-color: #f19da9 !important; color: #ffffff !important;
             font-size: 36px; font-weight: 900;
             padding: 12px 36px; border-radius: 20px;
             text-transform: uppercase; letter-spacing: 2px; z-index: 10;
+            box-shadow: none !important; border: none !important;
         }
     </style>
 </head>
@@ -423,7 +422,11 @@ async function generateAllIGPosters() {
             await new Promise(r => setTimeout(r, 400));
 
             const targetElement = document.getElementById("igPostTemplate");
-            const canvas = await html2canvas(targetElement, { useCORS: true, scale: 1 });
+            const canvas = await html2canvas(targetElement, { 
+                useCORS: true, 
+                scale: 1,
+                backgroundColor: "#ffffff"
+            });
             
             const link = document.createElement("a");
             const cleanBrand = brandName.replace(/[^a-zA-Z0-9]/g, "_");
