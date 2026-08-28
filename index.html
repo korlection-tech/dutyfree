@@ -117,18 +117,19 @@
         .ig-grid-item { position: relative; width: 100%; height: 100%; overflow: hidden; background: #ffffff; border: 2px solid #f2f2f2; box-sizing: border-box; }
         .ig-grid-item img { width: 100%; height: 100%; object-fit: cover; }
         
-        /* 1. 產品名稱排版：自動調整字型大小，支援多行顯示 */
+        /* 1. 產品名稱排版：純白底色 + 黑色字體，支援多行與自動字型調節 */
         .ig-tag-title {
             position: absolute; top: 20px; left: 20px; right: 20px;
-            background: rgba(255, 255, 255, 0.9); color: #000;
+            background: #ffffff; color: #000000;
             padding: 8px 14px; border-radius: 8px;
             font-size: 24px; font-weight: bold; line-height: 1.25;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+            border: 1px solid #eeeeee;
             word-wrap: break-word; word-break: break-word;
             display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
         }
         
-        /* 2. 價錢：位置移至卡片正下方中間、白底黑字、字體加大 30% (38px) */
+        /* 2. 價錢：正下方中間 + 純白底色 + 黑色大字體 */
         .ig-tag-price {
             position: absolute; bottom: 25px; left: 50%; transform: translateX(-50%);
             background: #ffffff; color: #000000;
@@ -136,10 +137,10 @@
             font-size: 38px; font-weight: 900;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             text-align: center; white-space: nowrap; line-height: 1.2;
-            border: 1px solid #eee;
+            border: 1px solid #eeeeee;
         }
 
-        /* 3. 中間品牌名：單一粉紅色背景，乾淨簡潔 */
+        /* 3. 中間品牌名：單一粉紅色背景 */
         .ig-center-brand {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             background: #f19da9; color: white;
@@ -399,13 +400,11 @@ async function generateAllIGPosters() {
                     let rawPrice = item['Price (HKD)'] || '0';
                     let titleStr = item['Product Name'] || '';
                     
-                    // 價格自動補上 $ 符號 (若原文字沒有)
                     let formattedPrice = String(rawPrice).trim();
                     if (!formattedPrice.includes('$') && !isNaN(parseFloat(formattedPrice))) {
                         formattedPrice = '$' + formattedPrice;
                     }
 
-                    // 根據品名字數長度自動縮小字體，確保能完整出晒 2-3 行
                     let fontSize = '24px';
                     if (titleStr.length > 60) {
                         fontSize = '18px';
