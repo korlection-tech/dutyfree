@@ -233,11 +233,11 @@ function formatPriceText(priceRaw) {
 
 document.addEventListener("DOMContentLoaded", function() {
     const cacheBuster = "?v=" + new Date().getTime();
+    // 💡 專為 Olive Young 設定，優先讀取 olive_pricelist_3.csv，不會調用 Duty Free 檔案
     const possibleNames = [
-        "pricelist.csv" + cacheBuster,
-        "Duty Free Pricelist.csv" + cacheBuster,
-        "Duty%20Free%20Pricelist.csv" + cacheBuster,
-        "Duty Free Pricelist.csv.csv" + cacheBuster
+        "olive_pricelist_3.csv" + cacheBuster,
+        "olive_pricelist.csv" + cacheBuster,
+        "pricelist.csv" + cacheBuster
     ];
     let attemptIndex = 0;
 
@@ -245,7 +245,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (attemptIndex >= possibleNames.length) {
             const statusDiv = document.getElementById("statusMessage");
             statusDiv.className = "status-message status-error";
-            statusDiv.innerText = "❌ 錯誤：找不到您的 CSV 資料庫檔案。請確保資料庫與 index.html 放喺 GitHub 嘅同一個根目錄資料夾。";
+            statusDiv.innerText = "❌ 錯誤：找不到 olive_pricelist_3.csv 資料庫檔案。請確保檔案已上傳至 GitHub 根目錄。";
             return;
         }
 
@@ -272,6 +272,11 @@ document.addEventListener("DOMContentLoaded", function() {
     tryLoadCSV();
 });
 
+function parseKeywords(text) {
+    if (!text.trim()) return [];
+    return text.split(/[\n,，\s]+/).filter(k => k.trim() !== "");
+}
+
 document.getElementById('searchInput').addEventListener('input', function() {
     let keywords = parseKeywords(this.value);
     let hint = document.getElementById('brandCountHint');
@@ -279,9 +284,37 @@ document.getElementById('searchInput').addEventListener('input', function() {
     hint.style.color = keywords.length > 10 ? '#e53e3e' : '#6c757d';
 });
 
-function parseKeywords(text) {
-    if (!text.trim()) return [];
-    return text.split(/[\n,，\s]+/).filter(k => k.trim() !== "");
+// 💡 相對路徑修復 (例如 details/C00301.jpg -> /details/C00301.jpg)
+function fixImageUrl(url) {
+    if (!url) return "";
+    let clean = url.trim();
+    if (clean === "") return "";
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+        if (!clean.startsWith('/')) clean = '/' + clean;
+    }
+    return clean;
+}
+
+// 從商品提取所有有效的圖片網址
+function extractImages(item) {
+    let list = [];
+    const rawDetail = item["Detail Image"] || "";
+    const rawMain = item["Image"] || "";
+
+    if (rawDetail.trim() !== "") {
+        const detailArray = rawDetail.split(';').join(',').split(',');
+        detailArray.forEach(u => {
+            const fixed = fixImageUrl(u);
+            if (fixed && !list.includes(fixed)) list.push(fixed);
+        });
+    }
+    
+    const fixedMain = fixImageUrl(rawMain);
+    if (fixedMain && !list.includes(fixedMain)) {
+        list.unshift(fixedMain);
+    }
+
+    return list;
 }
 
 function performSearch() {
@@ -308,20 +341,19 @@ function performSearch() {
     if (filtered.length === 0) {
         grid.innerHTML = '<div class="no-result">沒有找到相符的商品，請檢查拼字或更換關鍵字。</div>';
     } else {
-        filtered.forEach((item) => {
+        filtered.forEach((item, index) => {
             const brand = item["Brand"] || "Unknown";
             const name = item["Product Name"] || "無品名";
-            const price = item["Price (HKD)"] || "未定價";
-            const imgUrl = item["Image"] || "";
-            const detailImgUrl = item["Detail Image"] && item["Detail Image"].trim() !== "" ? item["Detail Image"] : imgUrl;
+            const price = item["Price 1 (HKD)"] || item["Price (HKD)"] || "未定價";
+            const mainImg = fixImageUrl(item["Image"]) || "https://placehold.co/200x200?text=No+Image";
             
             const card = document.createElement('div');
             card.className = 'card';
-            card.onclick = () => openModal(brand, name, price, detailImgUrl);
+            card.onclick = () => openModal(index, filtered);
             
             card.innerHTML = `
                 <div class="image-container">
-                    <img src="${imgUrl}" alt="${name}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
+                    <img src="${mainImg}" alt="${name}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
                 </div>
                 <div class="brand-badge">${brand}</div>
                 <div class="product-name" title="${name}">${name}</div>
@@ -336,29 +368,39 @@ function performSearch() {
     }
 }
 
-// 💡 核心防撞與圖片多選載入機制
-function openModal(brand, name, price, detailImgRaw) {
+function openModal(itemIndex, currentFilteredList) {
+    const item = currentFilteredList[itemIndex];
+    const brand = item["Brand"] || "Unknown";
+    const name = item["Product Name"] || "無品名";
+    const price = item["Price 1 (HKD)"] || item["Price (HKD)"] || "未定價";
+    
     const mainImg = document.getElementById('modalImg');
     const thumbContainer = document.getElementById('thumbContainer');
     thumbContainer.innerHTML = ''; 
     
-    // 1. 將包含多個網址（或最多50個）的字串拆解，並完全過濾空字串與無效網址
-    const imgList = (detailImgRaw || "")
-        .split(';')
-        .join(',')
-        .split(',')
-        .map(url => url.trim())
-        .filter(url => url !== "");
+    // 強制圖片撐滿 Modal 寬度，徹底解決長圖被壓窄問題
+    mainImg.style.width = "100%";
+    mainImg.style.height = "auto";
+    mainImg.style.display = "block";
 
-    // 如果沒有圖片網址，顯示預設備用圖
+    const imgList = extractImages(item);
+
     if (imgList.length === 0) {
         mainImg.src = 'https://placehold.co/400x400?text=No+Detail+Image';
         thumbContainer.style.display = 'none';
     } else {
-        // 設定大圖為第一張有效圖片
         mainImg.src = imgList[0];
         
-        // 如果有效圖片大於 1 張，動態產生縮圖列
+        let validIdx = 0;
+        mainImg.onerror = function() {
+            validIdx++;
+            if (validIdx < imgList.length) {
+                mainImg.src = imgList[validIdx];
+            } else {
+                mainImg.src = 'https://placehold.co/400x400?text=No+Detail+Image';
+            }
+        };
+
         if (imgList.length > 1) {
             thumbContainer.style.display = 'flex';
             imgList.forEach((url, idx) => {
@@ -366,7 +408,7 @@ function openModal(brand, name, price, detailImgRaw) {
                 thumb.className = 'thumb-img' + (idx === 0 ? ' active' : '');
                 thumb.src = url;
                 
-                // 防撞保險：單張縮圖載入失敗時自動隱藏該縮圖
+                // 防撞保險：縮圖若 404 自動隱藏
                 thumb.onerror = function() {
                     this.style.display = 'none';
                 };
@@ -423,7 +465,7 @@ async function generateAllIGPosters() {
                 cell.innerHTML = "";
                 if (chunk[c]) {
                     const item = chunk[c];
-                    let rawPrice = item['Price (HKD)'] || '0';
+                    let rawPrice = item['Price 1 (HKD)'] || item['Price (HKD)'] || '0';
                     let titleStr = item['Product Name'] || '';
                     
                     let formattedPrice = String(rawPrice).trim();
@@ -438,8 +480,10 @@ async function generateAllIGPosters() {
                         fontSize = '20px';
                     }
 
+                    const imgUrl = fixImageUrl(item['Image']);
+
                     cell.innerHTML = `
-                        <img src="${item['Image'] || ''}" crossorigin="anonymous" onerror="this.src='https://placehold.co/500x500?text=No+Image'">
+                        <img src="${imgUrl}" crossorigin="anonymous" onerror="this.src='https://placehold.co/500x500?text=No+Image'">
                         <div class="ig-tag-title" style="font-size: ${fontSize};">${titleStr}</div>
                         <div class="ig-tag-price">${formattedPrice}</div>
                     `;
