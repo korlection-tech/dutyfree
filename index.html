@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>免稅商品價格查詢系統 v2.1</title>
+    <title>免稅商品價格查詢系統 v2.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -100,29 +100,32 @@
             gap: 15px;
             margin-top: 15px;
         }
-        .btn-search,
-        .btn-ig-gen {
+        .btn-search {
+            flex: 2;
             padding: 14px;
+            background-color: #4a90e2;
+            color: white;
             border: none;
-            border-radius: 8px;
-            color: #fff;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-search:hover {
+            background-color: #357abd;
+        }
+        .btn-ig-gen {
+            flex: 1;
+            padding: 14px;
+            background: linear-gradient(135deg, #ff5c9b, #ec2875);
+            color: white;
+            border: none;
+            border-radius: 6px;
             font-size: 17px;
             font-weight: bold;
             cursor: pointer;
             transition: transform 0.18s ease, box-shadow 0.18s ease;
-        }
-        .btn-search {
-            flex: 2;
-            background-color: #4a90e2;
-        }
-        .btn-search:hover {
-            background-color: #357abd;
-            transform: translateY(-2px);
-        }
-        .btn-ig-gen {
-            flex: 1;
-            background: linear-gradient(135deg, #ff5c9b, #ec2875);
-            box-shadow: 0 6px 14px rgba(236, 40, 117, 0.20);
         }
         .btn-ig-gen:hover {
             transform: translateY(-2px);
@@ -215,13 +218,17 @@
             font-size: 16px;
         }
 
-        /* IG poster */
         #renderCanvasHidden {
             position: fixed;
             left: -10000px;
-            top: 0;
+            top: -10000px;
+            width: 0;
+            height: 0;
+            overflow: hidden;
             opacity: 0;
+            visibility: hidden;
             pointer-events: none;
+            z-index: -1;
         }
         .ig-poster {
             width: 1080px;
@@ -299,7 +306,7 @@
     <div class="subtitle">步驟 1：載入 CSV 檔案 ➔ 步驟 2：輸入關鍵字查價／一鍵生成 Featured IG 圖</div>
 
     <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-        <p id="uploadStatus">📁 點擊這裡 或 把「Duty Free Pricelist.csv」拖到這裡載入資料庫</p>
+        <p id="uploadStatus">📁 點擊這裡 或 把「pricelist.csv」拖到這裡載入資料庫</p>
         <span style="font-size: 12px; color: #666;">(資料純網頁解析，絕不會上傳到任何外部伺服器，安全保密)</span>
         <input type="file" id="fileInput" accept=".csv">
     </div>
@@ -376,6 +383,8 @@ function handleFile(file) {
             dropZone.style.background = "#e8f5e9";
             dropZone.style.border = "2px solid #4caf50";
             searchBox.classList.add('active');
+
+            showFeaturedProducts();
         },
         error: function(err) {
             uploadStatus.innerText = "❌ 解析檔案失敗，請確保是正確的 CSV 格式表格。";
@@ -418,41 +427,20 @@ function escapeHtml(value) {
         .replace(/'/g, "&#039;");
 }
 
-function performSearch() {
-    const rawInput = document.getElementById('searchInput').value;
-    let keywords = parseKeywords(rawInput);
-
-    if (keywords.length === 0) {
-        alert("請至少輸入一個品牌或關鍵字。");
-        return;
-    }
-
-    if (keywords.length > 10) {
-        alert("⚠️ 每次最多只能同時查詢 10 個品牌/關鍵字！\n系統將自動抓取前 10 個進行搜尋。");
-        keywords = keywords.slice(0, 10);
-    }
-
+function showFeaturedProducts() {
+    const featured = productsData.filter(isFeaturedProduct);
     const grid = document.getElementById('resultsGrid');
     const countDiv = document.getElementById('resultsCount');
     grid.innerHTML = '';
 
-    const filtered = productsData.filter(product => {
-        return keywords.some(keyword => {
-            const k = keyword.toLowerCase().trim();
-            const brandMatch = product["Brand"] ? product["Brand"].toLowerCase().includes(k) : false;
-            const nameMatch = product["Product Name"] ? product["Product Name"].toLowerCase().includes(k) : false;
-            return brandMatch || nameMatch;
-        });
-    });
+    countDiv.innerText = `⭐ Featured 精選商品：共 ${featured.length} 件`;
 
-    countDiv.innerText = `🔍 找到 ${filtered.length} 筆相關商品 (基於 ${keywords.length} 個關鍵字：${keywords.join(', ')})`;
-
-    if (filtered.length === 0) {
-        grid.innerHTML = '<div class="no-result">沒有找到相符的商品，請檢查拼字或更換關鍵字。</div>';
+    if (featured.length === 0) {
+        grid.innerHTML = '<div class="no-result">暫時沒有 Featured 商品。</div>';
         return;
     }
 
-    filtered.forEach(item => {
+    featured.forEach(item => {
         const brand = item["Brand"] || "Unknown";
         const name = item["Product Name"] || "無品名";
         const price = item["Price (HKD)"] || "未定價";
@@ -557,6 +545,68 @@ async function generateFeaturedPosters() {
     }
 
     alert("🎉 Featured 產品的 IG 宣傳圖已全部成功生成並下載！");
+}
+
+function parseKeywordsOld(text) {
+    if (!text.trim()) return [];
+    return text.split(/[\n,，\s]+/).filter(k => k.trim() !== "");
+}
+
+function performSearch() {
+    const rawInput = document.getElementById('searchInput').value;
+    let keywords = parseKeywords(rawInput);
+
+    if (keywords.length === 0) {
+        alert("請至少輸入一個品牌或關鍵字。");
+        return;
+    }
+
+    if (keywords.length > 10) {
+        alert("⚠️ 每次最多只能同時查詢 10 個品牌/關鍵字！\n系統將自動抓取前 10 個進行搜尋。");
+        keywords = keywords.slice(0, 10);
+    }
+
+    const grid = document.getElementById('resultsGrid');
+    const countDiv = document.getElementById('resultsCount');
+    grid.innerHTML = '';
+
+    const filtered = productsData.filter(product => {
+        return keywords.some(keyword => {
+            const k = keyword.toLowerCase().trim();
+            const brandMatch = product["Brand"] ? product["Brand"].toLowerCase().includes(k) : false;
+            const nameMatch = product["Product Name"] ? product["Product Name"].toLowerCase().includes(k) : false;
+            return brandMatch || nameMatch;
+        });
+    });
+
+    countDiv.innerText = `🔍 找到 ${filtered.length} 筆相關商品 (基於 ${keywords.length} 個關鍵字：${keywords.join(', ')})`;
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div class="no-result">沒有找到相符的商品，請檢查拼字或更換關鍵字。</div>';
+        return;
+    }
+
+    filtered.forEach(item => {
+        const brand = item["Brand"] || "Unknown";
+        const name = item["Product Name"] || "無品名";
+        const price = item["Price (HKD)"] || "未定價";
+        const imgUrl = item["Image"] || "";
+
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+            <div class="image-container">
+                <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
+            </div>
+            <div class="brand-badge">${escapeHtml(brand)}</div>
+            <div class="product-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
+            <div class="price-wrapper">
+                <span class="price-label">價格</span>
+                <span class="price">HKD $${escapeHtml(price)}</span>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
 }
 </script>
 
