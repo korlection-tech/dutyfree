@@ -8,7 +8,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #f4f6f9;
             margin: 0;
             padding: 20px;
@@ -22,7 +22,6 @@
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
         }
-        
         .header-section { text-align: center; margin-bottom: 25px; }
         .company-logo { 
             width: 100px; height: 100px; border-radius: 50%; object-fit: cover; margin-bottom: 12px; 
@@ -31,7 +30,6 @@
         h1 { color: #1a1a1a; margin: 0 0 8px 0; font-size: 28px; font-weight: 700; }
         .subtitle { color: #4a5568; margin: 0 0 6px 0; font-size: 15px; font-weight: 600; }
         .notice-text { color: #e53e3e; font-size: 13px; margin: 0; font-weight: 500; }
-        
         .status-message { text-align: center; padding: 12px; margin-bottom: 20px; border-radius: 6px; font-size: 14px; font-weight: bold; }
         .status-loading { background: #fff3cd; color: #856404; }
         .status-error { background: #f8d7da; color: #721c24; }
@@ -46,7 +44,6 @@
         }
         textarea:focus { border-color: #001f3f; outline: none; }
         .hint { font-size: 13px; color: #6c757d; margin-top: 8px; display: flex; justify-content: space-between; }
-        
         .btn-group { display: flex; gap: 15px; margin-top: 15px; }
         .btn-search {
             flex: 2; padding: 14px; background-color: #001f3f; color: white;
@@ -55,7 +52,6 @@
         .btn-search:hover { background-color: #001124; }
         .btn-search:disabled { background-color: #a0aec0; cursor: not-allowed; }
 
-        /* 🔒 隱藏按鈕預設隱藏 (display: none) */
         .btn-ig-gen {
             display: none; 
             flex: 1; padding: 14px; background-color: #e1306c; color: white;
@@ -64,7 +60,11 @@
         }
         .btn-ig-gen:hover { background-color: #c12056; }
 
-        /* Grid 與卡片 */
+        .filter-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .filter-btn { padding: 9px 16px; border: 1px solid #d7dee7; background: #fff; color: #2c3e50; border-radius: 999px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s ease; }
+        .filter-btn:hover { border-color: #001f3f; color: #001f3f; }
+        .filter-btn.active { background: #001f3f; border-color: #001f3f; color: #fff; }
+
         .results-count { margin-bottom: 15px; font-weight: bold; color: #2c3e50; font-size: 17px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
         .card {
@@ -87,7 +87,6 @@
         .no-result { text-align: center; color: #a0aec0; grid-column: 1 / -1; padding: 50px; font-size: 16px; }
         .click-tip { font-size: 11px; color: #3498db; text-align: right; margin-top: 2px; }
 
-        /* Modal 彈出視窗 */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7); display: flex; align-items: center; justify-content: center; z-index: 9999; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
@@ -112,44 +111,43 @@
         .modal-price-label { font-size: 14px; color: #c53030; font-weight: 600; }
         .modal-price { font-size: 20px; color: #e53e3e; font-weight: bold; text-align: right; line-height: 1.3; }
 
-        /* 📸 隱藏繪圖渲染區 (1080x1080 IG Post 格式) */
         #renderCanvasHidden {
-            position: absolute; left: -9999px; top: -9999px; width: 1080px; height: 1080px; background: #ffffff;
+            position: fixed; left: -10000px; top: -10000px; width: 0; height: 0;
+            overflow: hidden; opacity: 0; visibility: hidden; pointer-events: none; z-index: -1;
         }
-        .ig-poster-1080 {
-            width: 1080px; height: 1080px; background: #ffffff; position: relative; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; box-sizing: border-box;
+        .ig-poster-1350 {
+            width: 1080px; height: 1350px; background: #ffffff; position: relative;
+            display: grid; grid-template-columns: 540px 540px; grid-template-rows: 675px 675px; box-sizing: border-box;
         }
         .ig-grid-item {
-            position: relative; width: 100%; height: 100%; overflow: hidden; background: #ffffff; border: 1px solid #eeeeee; box-sizing: border-box;
+            position: relative; width: 540px; height: 675px; overflow: hidden; background: #ffffff;
+            border: 1px solid #eeeeee; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center;
         }
         .ig-grid-item img {
-            width: 100%; height: 100%; object-fit: cover;
+            max-width: 96%; max-height: 72%; width: auto; height: auto;
+            object-fit: contain; display: block; margin: auto;
         }
-        
-        /* 左上角：Brand Name + Product Name 盒子 (純白底色 + 黑色字體) */
         .ig-tag-top-left {
-            position: absolute; top: 18px; left: 18px; max-width: calc(100% - 36px);
+            position: absolute; top: 16px; left: 16px; right: 16px;
             background-color: #ffffff !important; color: #000000 !important;
             padding: 8px 12px; border-radius: 6px;
             box-shadow: none !important; border: none !important;
-            text-align: left;
+            text-align: left; word-break: break-word; white-space: normal;
         }
         .ig-item-brand {
-            font-size: 18px; font-weight: 900; color: #001f3f !important;
-            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; line-height: 1.2;
+            font-size: 15px; font-weight: 900; color: #1D63FF !important;
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; line-height: 1.2;
         }
         .ig-item-title {
-            font-size: 22px; font-weight: bold; color: #000000 !important; line-height: 1.25;
-            word-wrap: break-word; word-break: break-word;
-            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+            font-size: 18px; font-weight: bold; color: #000000 !important; line-height: 1.25;
+            word-wrap: break-word; word-break: break-word; white-space: normal;
         }
-        
-        /* 下方中間：單一價錢標籤 (純白底色 + 黑色大字體) */
         .ig-tag-price {
             position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
             background-color: #ffffff !important; color: #000000 !important;
             padding: 6px 20px; border-radius: 8px;
-            font-size: 36px; font-weight: 900;
+            font-size: 34px; font-weight: 900;
             box-shadow: none !important; border: none !important;
             text-align: center; white-space: nowrap; line-height: 1.2;
         }
@@ -164,7 +162,7 @@
         <div class="subtitle">每次最多可同時查詢 10 個品牌</div>
         <p class="notice-text">*價格可能會因免稅店的促銷優惠而有所變動，請於落單前與店主確認價格</p>
     </div>
-    
+
     <div id="statusMessage" class="status-message status-loading">⏳ 正在連線讀取 pricelist.csv 產品資料庫，請稍候...</div>
 
     <div class="search-box">
@@ -176,16 +174,23 @@
         </div>
         <div class="btn-group">
             <button class="btn-search" id="searchBtn" onclick="performSearch()" disabled>請稍候...</button>
-            <!-- 🔒 隱藏的 Gen 圖按鈕 (按 Ctrl + Shift + G 顯示) -->
             <button class="btn-ig-gen" id="igGenBtn" onclick="generateFeaturedIGPosters()">📸 一鍵生成 Featured IG 宣傳圖</button>
         </div>
+    </div>
+
+    <div class="filter-bar" id="filterBar">
+        <button class="filter-btn active" data-filter="featured" onclick="setCategoryFilter('featured')">⭐ Featured</button>
+        <button class="filter-btn" data-filter="skincare" onclick="setCategoryFilter('skincare')">Skincare</button>
+        <button class="filter-btn" data-filter="cosmetics" onclick="setCategoryFilter('cosmetics')">Cosmetics</button>
+        <button class="filter-btn" data-filter="supplement" onclick="setCategoryFilter('supplement')">Supplement</button>
+        <button class="filter-btn" data-filter="accessories" onclick="setCategoryFilter('accessories')">Accessories</button>
+        <button class="filter-btn" data-filter="bag" onclick="setCategoryFilter('bag')">Bag</button>
     </div>
 
     <div class="results-count" id="resultsCount"></div>
     <div class="grid" id="resultsGrid"></div>
 </div>
 
-<!-- Modal 彈出視窗 -->
 <div class="modal-overlay" id="detailModal" onclick="closeModal(event)">
     <div class="modal-wrapper" onclick="event.stopPropagation()">
         <button class="close-btn" onclick="closeModal(event, true)">&times;</button>
@@ -202,9 +207,8 @@
     </div>
 </div>
 
-<!-- 隱藏截圖畫布容器 (1080x1080 一開四，無中間 Brand Name) -->
 <div id="renderCanvasHidden">
-    <div class="ig-poster-1080" id="igPostTemplate">
+    <div class="ig-poster-1350" id="igPostTemplate">
         <div class="ig-grid-item" id="igCell0"></div>
         <div class="ig-grid-item" id="igCell1"></div>
         <div class="ig-grid-item" id="igCell2"></div>
@@ -214,8 +218,8 @@
 
 <script>
 let productsData = []; 
+let currentFilter = "featured";
 
-// 🔒 快捷鍵觸發機制 (Ctrl + Shift + G)
 document.addEventListener('keydown', function(event) {
     if ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === 'G' || event.key === 'g')) {
         event.preventDefault();
@@ -225,7 +229,6 @@ document.addEventListener('keydown', function(event) {
     }
 });
 
-// 判斷是否為 Featured 產品
 function isProductFeatured(item) {
     const val = item["Featured"] || item["featured"] || item["FEATURED"] || "";
     const cleanVal = String(val).trim().toUpperCase();
@@ -237,7 +240,57 @@ function formatPriceText(priceRaw) {
     return String(priceRaw).replace(/\n/g, "<br>");
 }
 
-// 渲染商品卡片列表
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function updateFilterButtons() {
+    document.querySelectorAll(".filter-btn").forEach(function(button) {
+        button.classList.toggle("active", button.dataset.filter === currentFilter);
+    });
+}
+
+function setCategoryFilter(filter) {
+    currentFilter = filter;
+    updateFilterButtons();
+    renderCurrentFilter();
+}
+
+function categoryMatches(item, filter) {
+    const category = String(item["Category"] || item["category"] || "").toLowerCase();
+    return category.includes(filter);
+}
+
+function renderCurrentFilter() {
+    const grid = document.getElementById('resultsGrid');
+    const countDiv = document.getElementById('resultsCount');
+    grid.innerHTML = "";
+
+    let items = [];
+
+    if (currentFilter === "featured") {
+        items = productsData.filter(isProductFeatured);
+        countDiv.innerText = `🔥 店主精選推介 (共 ${items.length} 款熱門商品)`;
+    } else {
+        items = productsData.filter(function(item) {
+            return categoryMatches(item, currentFilter);
+        });
+        countDiv.innerText = `共 ${items.length} 件商品`;
+    }
+
+    if (items.length === 0) {
+        grid.innerHTML = '<div class="no-result">沒有符合目前篩選條件的商品。</div>';
+        return;
+    }
+
+    renderProducts(items, countDiv.innerText);
+}
+
 function renderProducts(list, titleText) {
     const grid = document.getElementById('resultsGrid');
     const countDiv = document.getElementById('resultsCount');
@@ -256,18 +309,18 @@ function renderProducts(list, titleText) {
         const imgUrl = item["Image"] || "";
         const detailImgUrl = item["Detail Image"] && item["Detail Image"].trim() !== "" ? item["Detail Image"] : imgUrl;
         const featured = isProductFeatured(item);
-        
+
         const card = document.createElement('div');
         card.className = 'card';
         card.onclick = () => openModal(brand, name, price, detailImgUrl);
-        
+
         card.innerHTML = `
             ${featured ? '<div class="featured-ribbon">🔥 精選</div>' : ''}
             <div class="image-container">
-                <img src="${imgUrl}" alt="${name}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
+                <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(name)}" onerror="this.src='https://placehold.co/200x200?text=No+Image'">
             </div>
-            <div class="brand-badge">${brand}</div>
-            <div class="product-name" title="${name}">${name}</div>
+            <div class="brand-badge">${escapeHtml(brand)}</div>
+            <div class="product-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>
             <div class="price-wrapper">
                 <span class="price-label">價格</span>
                 <span class="price">${formatPriceText(price)}</span>
@@ -278,15 +331,10 @@ function renderProducts(list, titleText) {
     });
 }
 
-// 顯示所有 Featured 產品
 function showFeaturedProducts() {
-    const featuredList = productsData.filter(isProductFeatured);
-    if (featuredList.length > 0) {
-        renderProducts(featuredList, `🔥 店主精選推介 (共 ${featuredList.length} 款熱門商品)`);
-    } else {
-        document.getElementById('resultsCount').innerText = "";
-        document.getElementById('resultsGrid').innerHTML = "";
-    }
+    currentFilter = "featured";
+    updateFilterButtons();
+    renderCurrentFilter();
 }
 
 document.addEventListener("DOMContentLoaded", function() {
@@ -316,8 +364,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const searchBtn = document.getElementById("searchBtn");
             searchBtn.disabled = false;
             searchBtn.innerText = "立即查詢價格";
-            
-            // 一入網站即刻顯示 Featured 產品
+
             showFeaturedProducts();
         },
         error: function(err) {
@@ -343,18 +390,17 @@ function parseKeywords(text) {
 function performSearch() {
     const rawInput = document.getElementById('searchInput').value;
     let keywords = parseKeywords(rawInput);
-    
-    // 如果搜尋框留空按查詢，自動顯示返 Featured 產品
+
     if (keywords.length === 0) {
         showFeaturedProducts();
         return;
     }
-    
+
     if (keywords.length > 10) { 
         alert("⚠️ 每次最多只能同時查詢 10 個品牌！\n系統將自動抓取前 10 個。"); 
         keywords = keywords.slice(0, 10); 
     }
-    
+
     const filtered = productsData.filter(product => {
         return keywords.some(keyword => {
             const k = keyword.toLowerCase().trim();
@@ -363,7 +409,7 @@ function performSearch() {
             return brandMatch || nameMatch;
         });
     });
-    
+
     renderProducts(filtered, `🔍 找到 ${filtered.length} 筆相關商品 (基於 ${keywords.length} 個關鍵字：${keywords.join(', ')})`);
 }
 
@@ -371,10 +417,10 @@ function openModal(brand, name, price, detailImgRaw) {
     const mainImg = document.getElementById('modalImg');
     const thumbContainer = document.getElementById('thumbContainer');
     thumbContainer.innerHTML = ''; 
-    
+
     const imgList = detailImgRaw.split(';').join(',').split(',').map(url => url.trim()).filter(url => url !== "");
     mainImg.src = imgList[0];
-    
+
     if (imgList.length > 1) {
         thumbContainer.style.display = 'flex';
         imgList.forEach((url, idx) => {
@@ -395,7 +441,7 @@ function openModal(brand, name, price, detailImgRaw) {
     document.getElementById('modalBrand').innerText = brand;
     document.getElementById('modalTitle').innerText = name;
     document.getElementById('modalPrice').innerHTML = formatPriceText(price);
-    
+
     document.getElementById('detailModal').classList.add('active');
     document.querySelector('.modal-content').scrollTop = 0;
 }
@@ -406,15 +452,14 @@ function closeModal(event, force = false) {
     }
 }
 
-// 📸 生成 Featured IG 宣傳圖 (一開四、按順序填滿、不限同品牌、左上角放 Brand + Product Name、下方中間放單一價錢)
 async function generateFeaturedIGPosters() {
     if (productsData.length === 0) { 
         alert("資料庫未載入完成，請稍候再試。"); 
         return; 
     }
-    
+
     const featuredItems = productsData.filter(isProductFeatured);
-    
+
     if (featuredItems.length === 0) {
         alert("⚠️ 資料庫入面暫時搵唔到任何標記為 Featured (TRUE) 嘅產品！");
         return;
@@ -426,51 +471,61 @@ async function generateFeaturedIGPosters() {
     for (let i = 0; i < featuredItems.length; i += 4) {
         const chunk = featuredItems.slice(i, i + 4);
         const pageNum = Math.floor(i / 4) + 1;
-        
+
         for (let c = 0; c < 4; c++) {
             const cell = document.getElementById("igCell" + c);
             cell.innerHTML = "";
-            
+
             if (chunk[c]) {
                 const item = chunk[c];
                 const brandStr = item['Brand'] || '';
                 const titleStr = item['Product Name'] || '';
-                // 直接讀取 Price (HKD) 內容，不做任何自動計算或修改
                 const priceDisplay = item['Price (HKD)'] ? String(item['Price (HKD)']).trim() : '';
 
-                let titleFontSize = '22px';
+                let titleFontSize = '18px';
                 if (titleStr.length > 60) {
-                    titleFontSize = '17px';
+                    titleFontSize = '15px';
                 } else if (titleStr.length > 40) {
-                    titleFontSize = '19px';
+                    titleFontSize = '16px';
                 }
 
                 cell.innerHTML = `
-                    <img src="${item['Image'] || ''}" crossorigin="anonymous" onerror="this.src='https://placehold.co/540x540?text=No+Image'">
+                    <img src="${escapeHtml(item['Image'] || '')}" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="this.src='https://placehold.co/540x675?text=No+Image'">
                     <div class="ig-tag-top-left">
-                        <div class="ig-item-brand">${brandStr}</div>
-                        <div class="ig-item-title" style="font-size: ${titleFontSize};">${titleStr}</div>
+                        <div class="ig-item-brand">${escapeHtml(brandStr)}</div>
+                        <div class="ig-item-title" style="font-size: ${titleFontSize};">${escapeHtml(titleStr)}</div>
                     </div>
-                    ${priceDisplay ? `<div class="ig-tag-price">${priceDisplay}</div>` : ''}
+                    ${priceDisplay ? `<div class="ig-tag-price">$${escapeHtml(priceDisplay)}</div>` : ''}
                 `;
             }
         }
 
+        const poster = document.getElementById("igPostTemplate");
+        const images = poster.querySelectorAll("img");
+
+        await Promise.all(Array.from(images).map(function(img) {
+            return new Promise(function(resolve) {
+                if (img.complete) { resolve(); return; }
+                img.onload = resolve;
+                img.onerror = resolve;
+            });
+        }));
+
         await new Promise(r => setTimeout(r, 450));
 
-        const targetElement = document.getElementById("igPostTemplate");
-        const canvas = await html2canvas(targetElement, { 
+        const canvas = await html2canvas(poster, { 
             useCORS: true, 
             scale: 1,
-            backgroundColor: "#ffffff"
+            backgroundColor: "#ffffff",
+            logging: false
         });
-        
+
         const link = document.createElement("a");
-        link.download = `Featured_IG_Part${pageNum}.png`;
+        link.download = `Featured_IG_Part${pageNum}_1080x1350.png`;
         link.href = canvas.toDataURL("image/png");
         link.click();
     }
-    
+
     alert(`🎉 已成功生成並下載全部 ${totalPages} 張 Featured IG 宣傳圖！`);
 }
 </script>
